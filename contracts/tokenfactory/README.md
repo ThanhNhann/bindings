@@ -57,8 +57,8 @@ sudo docker run --rm -v "$(pwd)":/code   --mount type=volume,source="$(basename 
 cd artifacts
 
 # Upload and store transaction hash in TX environment variable.
-TX=$(osmosisd tx wasm store tokenfactory.wasm  --from test1 --chain-id=localosmosis --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 -b block --output json -y | jq -r '.txhash')
-CODE_ID=$(osmosisd query tx $TX --output json | jq -r '.logs[0].events[-1].attributes[0].value')
+TX=$(osmosisd tx wasm store tokenfactory.wasm  --from test1 --chain-id=localosmosis --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --output json -y | jq -r '.txhash')
+CODE_ID=$(osmosisd query tx $TX --chain-id localosmosis --output json | jq -r '.events[] | select(.type=="store_code") | .attributes[] | select(.key=="code_id") | .value')
 echo "Your contract code_id is $CODE_ID"
 ```
 
@@ -110,10 +110,10 @@ For example, here is the schema for `CreateDenom` message:
 
 - `Create Denom`
 ```sh
-osmosisd tx wasm execute $CONTRACT_ADDR '{ "create_denom": { "subdenom": "mydenom" } }' --from test1 --amount 10000000uosmo -b block
+osmosisd tx wasm execute $CONTRACT_ADDR '{ "create_denom": { "subdenom": "mydenom" } }' --from test1 --amount 10000000uosmo --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
 
 # If you do this
-osmosisd q bank total --denom factory/$CONTRACT_ADDR/mydenom
+osmosisd q bank total-supply-of factory/$CONTRACT_ADDR/mydenom
 # You should see this:
 # amount: "0"
 #denom: factory/osmo1wug8sewp6cedgkmrmvhl3lf3tulagm9hnvy8p0rppz9yjw0g4wtqcm3670/mydenom
@@ -123,10 +123,10 @@ osmosisd q bank total --denom factory/$CONTRACT_ADDR/mydenom
 ```sh
 TEST2_ADDR=osmo18s5lynnmx37hq4wlrw9gdn68sg2uxp5rgk26vv # This is from the result of "Download and Install LocalOsmosis" section
 
-osmosisd tx wasm execute $CONTRACT_ADDR "{ \"mint_tokens\": {\"amount\": \"100\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"mint_to_address\": \"$TEST2_ADDR\"}}" --from test1 -b block
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"mint_tokens\": {\"amount\": \"100\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"mint_to_address\": \"$TEST2_ADDR\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
 
 # If you do this
-osmosisd q bank total --denom factory/$CONTRACT_ADDR/mydenom
+osmosisd q bank total-supply-of factory/$CONTRACT_ADDR/mydenom 
 # You should see this in the list:
 # - amount: "100"
 #   denom: factory/osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9
@@ -139,7 +139,7 @@ not supported. If you attempt to burn from another address that
 has a custom denom minted to but is not "" (empty string), you will get an error:
 
 ```sh
-osmosisd tx wasm execute $CONTRACT_ADDR "{ \"burn_tokens\": {\"amount\": \"50\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"burn_from_address\": \"$CONTRACT_ADDR\"}}" --from test1 -b block
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"burn_tokens\": {\"amount\": \"50\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"burn_from_address\": \"$CONTRACT_ADDR\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
 
 # You will see the following:
 # raw_log: 'failed to execute message; message index: 0: address is not supported yet,
@@ -154,15 +154,15 @@ Next, we will use the first "pre-mint" approach
 
 ```sh
 # Pre-mint 100 of custom denom to $CONTRACT_ADDR
-osmosisd tx wasm execute $CONTRACT_ADDR "{ \"mint_tokens\": {\"amount\": \"100\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"mint_to_address\": \"$CONTRACT_ADDR\"}}" --from test1 -b block
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"mint_tokens\": {\"amount\": \"100\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"mint_to_address\": \"$CONTRACT_ADDR\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis -y
 
 # Try to burn 50
-osmosisd tx wasm execute $CONTRACT_ADDR "{ \"burn_tokens\": {\"amount\": \"50\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"burn_from_address\": \"\"}}" --from test1 -b block
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"burn_tokens\": {\"amount\": \"50\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"burn_from_address\": \"\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis -y
 
 # If you do this
-osmosisd q bank total --denom factory/$CONTRACT_ADDR/mydenom
+osmosisd q bank total-supply-of factory/$CONTRACT_ADDR/mydenom
 # You should see this in the list:
-# - amount: "50"
+# - amount: "150"
 #   denom: factory/osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9
 ```
 
@@ -172,12 +172,13 @@ osmosisd q bank total --denom factory/$CONTRACT_ADDR/mydenom
 TEST2_ADDR=osmo18s5lynnmx37hq4wlrw9gdn68sg2uxp5rgk26vv # This is from the result of "Download and Install LocalOsmosis" section
 
 # Change Admin
-osmosisd tx wasm execute $CONTRACT_ADDR "{ \"change_admin\": {\"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"new_admin_address\": \"${TEST2_ADDR}\"}}" --from test1 -b block
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"change_admin\": {\"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"new_admin_address\": \"${TEST2_ADDR}\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
 
 # Verify New Admin
 osmosisd q tokenfactory denom-authority-metadata factory/${CONTRACT_ADDR}/mydenom
 # You should be able to see the following:
-# osmosisd q tokenfactory denom-authority-metadata factory/${CONTRACT_ADDR}/mydenom
+# authority_metadata:
+#  admin: osmo18s5lynnmx37hq4wlrw9gdn68sg2uxp5rgk26vv
 ```
 
 ##### Queries
