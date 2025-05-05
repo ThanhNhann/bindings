@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    entry_point, to_binary, to_vec, ContractResult, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    entry_point, to_json_binary, to_json_vec, ContractResult, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
     QueryRequest, QueryResponse, Reply, Response, StdError, StdResult, SubMsg, SystemResult,
 };
 use osmo_bindings::{OsmosisMsg, OsmosisQuery};
 
 use crate::errors::ReflectError;
 use crate::msg::{ChainResponse, ExecuteMsg, InstantiateMsg, OwnerResponse, QueryMsg};
-use crate::state::{config, config_read, replies, replies_read, State};
+use crate::state::{config, replies, State};
 
 #[entry_point]
 pub fn instantiate(
@@ -16,7 +16,7 @@ pub fn instantiate(
     _msg: InstantiateMsg,
 ) -> StdResult<Response<OsmosisMsg>> {
     let state = State { owner: info.sender };
-    config(deps.storage).save(&state)?;
+    config().save(deps.storage, &state)?;
     Ok(Response::default())
 }
 
@@ -40,7 +40,7 @@ pub fn execute_reflect(
     info: MessageInfo,
     msgs: Vec<CosmosMsg<OsmosisMsg>>,
 ) -> Result<Response<OsmosisMsg>, ReflectError> {
-    let state = config(deps.storage).load()?;
+    let state = config().load(deps.storage)?;
 
     if info.sender != state.owner {
         return Err(ReflectError::NotCurrentOwner {
@@ -64,7 +64,7 @@ pub fn execute_reflect_subcall(
     info: MessageInfo,
     msgs: Vec<SubMsg<OsmosisMsg>>,
 ) -> Result<Response<OsmosisMsg>, ReflectError> {
-    let state = config(deps.storage).load()?;
+    let state = config().load(deps.storage)?;
     if info.sender != state.owner {
         return Err(ReflectError::NotCurrentOwner {
             expected: state.owner.into(),
@@ -88,7 +88,7 @@ pub fn execute_change_owner(
     new_owner: String,
 ) -> Result<Response<OsmosisMsg>, ReflectError> {
     let api = deps.api;
-    config(deps.storage).update(|mut state| {
+    config().update(deps.storage, |mut state| {
         if info.sender != state.owner {
             return Err(ReflectError::NotCurrentOwner {
                 expected: state.owner.into(),
@@ -106,22 +106,21 @@ pub fn execute_change_owner(
 /// This just stores the result for future query
 #[entry_point]
 pub fn reply(deps: DepsMut<OsmosisQuery>, _env: Env, msg: Reply) -> Result<Response, ReflectError> {
-    let key = msg.id.to_be_bytes();
-    replies(deps.storage).save(&key, &msg)?;
+    replies().save(deps.storage, msg.id, &msg)?;
     Ok(Response::default())
 }
 
 #[entry_point]
 pub fn query(deps: Deps<OsmosisQuery>, _env: Env, msg: QueryMsg) -> StdResult<QueryResponse> {
     match msg {
-        QueryMsg::Owner {} => to_binary(&query_owner(deps)?),
-        QueryMsg::Chain { request } => to_binary(&query_chain(deps, &request)?),
-        QueryMsg::SubMsgResult { id } => to_binary(&query_subcall(deps, id)?),
+        QueryMsg::Owner {} => to_json_binary(&query_owner(deps)?),
+        QueryMsg::Chain { request } => to_json_binary(&query_chain(deps, &request)?),
+        QueryMsg::SubMsgResult { id } => to_json_binary(&query_subcall(deps, id)?),
     }
 }
 
 fn query_owner(deps: Deps<OsmosisQuery>) -> StdResult<OwnerResponse> {
-    let state = config_read(deps.storage).load()?;
+    let state = config().load(deps.storage)?;
     let resp = OwnerResponse {
         owner: state.owner.into(),
     };
@@ -129,15 +128,14 @@ fn query_owner(deps: Deps<OsmosisQuery>) -> StdResult<OwnerResponse> {
 }
 
 fn query_subcall(deps: Deps<OsmosisQuery>, id: u64) -> StdResult<Reply> {
-    let key = id.to_be_bytes();
-    replies_read(deps.storage).load(&key)
+    replies().load(deps.storage, id)
 }
 
 fn query_chain(
     deps: Deps<OsmosisQuery>,
     request: &QueryRequest<OsmosisQuery>,
 ) -> StdResult<ChainResponse> {
-    let raw = to_vec(request).map_err(|serialize_err| {
+    let raw = to_json_vec(request).map_err(|serialize_err| {
         StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
     })?;
     match deps.querier.raw_query(&raw) {

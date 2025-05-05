@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 
 use crate::error::TwapError;
@@ -41,7 +41,7 @@ pub fn query(deps: Deps<OsmosisQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bi
             base_asset_denom,
             start_time,
             end_time,
-        } => to_binary(&get_arithmetic_twap(
+        } => to_json_binary(&get_arithmetic_twap(
             deps,
             id,
             quote_asset_denom,
@@ -55,7 +55,7 @@ pub fn query(deps: Deps<OsmosisQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bi
             quote_asset_denom,
             base_asset_denom,
             start_time,
-        } => to_binary(&get_arithmetic_twap_to_now(
+        } => to_json_binary(&get_arithmetic_twap_to_now(
             deps,
             id,
             quote_asset_denom,

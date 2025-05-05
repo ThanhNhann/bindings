@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 
@@ -149,7 +149,7 @@ pub fn query(deps: Deps<OsmosisQuery>, _env: Env, msg: QueryMsg) -> StdResult<Bi
         QueryMsg::GetDenom {
             creator_address,
             subdenom,
-        } => to_binary(&get_denom(deps, creator_address, subdenom)),
+        } => to_json_binary(&get_denom(deps, creator_address, subdenom)),
     }
 }
 
@@ -236,7 +236,7 @@ mod tests {
                     creator_addr,
                     subdenom,
                 } => {
-                    let binary_request = to_binary(a).unwrap();
+                    let binary_request = to_json_binary(a).unwrap();
 
                     if creator_addr.eq("") {
                         return SystemResult::Err(SystemError::InvalidRequest {
