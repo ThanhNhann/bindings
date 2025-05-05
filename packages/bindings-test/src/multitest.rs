@@ -12,7 +12,7 @@ use thiserror::Error;
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
     coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CustomQuery, Decimal, Empty,
-    Fraction, Isqrt, Querier, QuerierResult, StdError, StdResult, Storage, Uint128,
+    Event, Fraction, Isqrt, Querier, QuerierResult, StdError, StdResult, Storage, Uint128,
 };
 use cw_multi_test::{
     App, AppResponse, BankKeeper, BankSudo, BasicAppBuilder, CosmosRouter, Module, WasmKeeper,
@@ -352,6 +352,33 @@ impl Module for OsmosisModule {
                 data: None,
                 events: vec![],
             }),
+            OsmosisMsg::ForceTransfer {
+                denom,
+                amount,
+                from_address,
+                to_address,
+            } => {
+                // Execute the transfer using the bank module
+                let transfer = BankMsg::Send {
+                    to_address: to_address.clone(),
+                    amount: coins(amount.u128(), &denom),
+                };
+
+                let from_addr = Addr::unchecked(from_address.clone());
+                router.execute(api, storage, block, from_addr, transfer.into())?;
+
+                Ok(AppResponse {
+                    data: None,
+                    events: vec![
+                        Event::new("message")
+                            .add_attribute("action", "force_transfer")
+                            .add_attribute("denom", denom)
+                            .add_attribute("amount", amount.to_string())
+                            .add_attribute("from", from_address)
+                            .add_attribute("to", to_address),
+                    ],
+                })
+            },
             OsmosisMsg::Swap {
                 first,
                 route,
