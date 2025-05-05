@@ -55,6 +55,12 @@ pub fn execute(
             amount,
             burn_from_address,
         } => burn_tokens(deps, denom, amount, burn_from_address),
+        ExecuteMsg::ForceTransfer {
+            denom,
+            amount,
+            from_address,
+            to_address,
+        } => force_transfer(deps, denom, amount, from_address, to_address),
     }
 }
 
@@ -139,6 +145,36 @@ pub fn burn_tokens(
     let res = Response::new()
         .add_attribute("method", "burn_tokens")
         .add_message(burn_token_msg);
+
+    Ok(res)
+}
+
+pub fn force_transfer(
+    deps: DepsMut<OsmosisQuery>,
+    denom: String,
+    amount: Uint128,
+    from_address: String,
+    to_address: String,
+) -> Result<Response<OsmosisMsg>, TokenFactoryError> {
+
+    if amount.eq(&Uint128::new(0_u128)) {
+        return Result::Err(TokenFactoryError::ZeroAmount {});
+    }
+
+    deps.api.addr_validate(&from_address)?;
+    deps.api.addr_validate(&to_address)?;
+    validate_denom(deps, denom.clone())?;
+
+    let force_transfer_msg = OsmosisMsg::ForceTransfer {
+        denom,
+        amount,
+        from_address,
+        to_address,
+    };
+
+    let res = Response::new()
+        .add_attribute("method", "force_transfer")
+        .add_message(force_transfer_msg);
 
     Ok(res)
 }
@@ -621,5 +657,138 @@ mod tests {
             }
             err => panic!("Unexpected error: {:?}", err),
         }
+    }
+
+    #[test]
+    fn msg_force_transfer_success() {
+        let mut deps = mock_dependencies();
+
+        const FROM_ADDR: &str = "from_addr";
+        const TO_ADDR: &str = "to_addr";
+        let transfer_amount = Uint128::new(100_u128);
+        let full_denom_name: &str = &format!("{}/{}/{}", DENOM_PREFIX, MOCK_CONTRACT_ADDR, DENOM_NAME)[..];
+
+        let info = mock_info("creator", &coins(2, "token"));
+
+        let msg = ExecuteMsg::ForceTransfer {
+            denom: String::from(full_denom_name),
+            amount: transfer_amount,
+            from_address: String::from(FROM_ADDR),
+            to_address: String::from(TO_ADDR),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        assert_eq!(1, res.messages.len());
+        let expected_message = CosmosMsg::from(OsmosisMsg::ForceTransfer {
+            denom: String::from(full_denom_name),
+            amount: transfer_amount,
+            from_address: String::from(FROM_ADDR),
+            to_address: String::from(TO_ADDR),
+        });
+        let actual_message = res.messages.get(0).unwrap();
+        assert_eq!(expected_message, actual_message.msg);
+
+        assert_eq!(1, res.attributes.len());
+        let expected_attribute = Attribute::new("method", "force_transfer");
+        let actual_attribute = res.attributes.get(0).unwrap();
+        assert_eq!(expected_attribute, actual_attribute);
+    }
+
+    #[test]
+    fn msg_force_transfer_zero_amount() {
+        let mut deps = mock_dependencies();
+
+        const FROM_ADDR: &str = "from_addr";
+        const TO_ADDR: &str = "to_addr";
+        let transfer_amount = Uint128::new(0_u128);
+        let full_denom_name: &str = &format!("{}/{}/{}", DENOM_PREFIX, MOCK_CONTRACT_ADDR, DENOM_NAME)[..];
+
+        let info = mock_info("creator", &coins(2, "token"));
+
+        let msg = ExecuteMsg::ForceTransfer {
+            denom: String::from(full_denom_name),
+            amount: transfer_amount,
+            from_address: String::from(FROM_ADDR),
+            to_address: String::from(TO_ADDR),
+        };
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(TokenFactoryError::ZeroAmount {}, err);
+    }
+
+    #[test]
+    fn msg_force_transfer_invalid_from_address() {
+        let mut deps = mock_dependencies();
+
+        const INVALID_ADDR: &str = "x"; // Too short to be valid
+        const TO_ADDR: &str = "to_addr";
+        let transfer_amount = Uint128::new(100_u128);
+        let full_denom_name: &str = &format!("{}/{}/{}", DENOM_PREFIX, MOCK_CONTRACT_ADDR, DENOM_NAME)[..];
+
+        let info = mock_info("creator", &coins(2, "token"));
+
+        let msg = ExecuteMsg::ForceTransfer {
+            denom: String::from(full_denom_name),
+            amount: transfer_amount,
+            from_address: String::from(INVALID_ADDR),
+            to_address: String::from(TO_ADDR),
+        };
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        match err {
+            TokenFactoryError::Std(StdError::GenericErr { msg, .. }) => {
+                assert!(msg.contains("human address too short"))
+            }
+            e => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn msg_force_transfer_invalid_to_address() {
+        let mut deps = mock_dependencies();
+
+        const FROM_ADDR: &str = "from_addr";
+        const INVALID_ADDR: &str = "x"; // Too short to be valid
+        let transfer_amount = Uint128::new(100_u128);
+        let full_denom_name: &str = &format!("{}/{}/{}", DENOM_PREFIX, MOCK_CONTRACT_ADDR, DENOM_NAME)[..];
+
+        let info = mock_info("creator", &coins(2, "token"));
+
+        let msg = ExecuteMsg::ForceTransfer {
+            denom: String::from(full_denom_name),
+            amount: transfer_amount,
+            from_address: String::from(FROM_ADDR),
+            to_address: String::from(INVALID_ADDR),
+        };
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        match err {
+            TokenFactoryError::Std(StdError::GenericErr { msg, .. }) => {
+                assert!(msg.contains("human address too short"))
+            }
+            e => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn msg_force_transfer_invalid_denom() {
+        let mut deps = mock_dependencies();
+
+        const FROM_ADDR: &str = "from_addr";
+        const TO_ADDR: &str = "to_addr";
+        let transfer_amount = Uint128::new(100_u128);
+        let invalid_denom: &str = &format!("{}/{}", DENOM_PREFIX, MOCK_CONTRACT_ADDR)[..];
+
+        let info = mock_info("creator", &coins(2, "token"));
+
+        let msg = ExecuteMsg::ForceTransfer {
+            denom: String::from(invalid_denom),
+            amount: transfer_amount,
+            from_address: String::from(FROM_ADDR),
+            to_address: String::from(TO_ADDR),
+        };
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        let expected_error = TokenFactoryError::InvalidDenom {
+            denom: String::from(invalid_denom),
+            message: String::from("denom must have 3 parts separated by /, had 2"),
+        };
+        assert_eq!(expected_error, err);
     }
 }
