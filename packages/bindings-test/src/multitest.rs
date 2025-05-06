@@ -9,7 +9,7 @@ use std::iter;
 use std::ops::{Deref, DerefMut};
 use thiserror::Error;
 
-use cosmwasm_std::testing::{MockApi, MockStorage, MOCK_CONTRACT_ADDR};
+use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
     coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CosmosMsg, CustomQuery, Decimal, Empty,
     Event, Fraction, Isqrt, Querier, QuerierResult, StdError, StdResult, Storage, Uint128,
@@ -358,23 +358,6 @@ impl Module for OsmosisModule {
                 from_address: _from_address,
                 to_address: _to_address,
             } => {
-                // Step 1: Transfer from sender to contract
-                // let from_addr = Addr::unchecked(from_address.clone());
-                // let contract_addr = Addr::unchecked(MOCK_CONTRACT_ADDR);
-                
-                // let transfer_to_contract = BankMsg::Send {
-                //     to_address: contract_addr.to_string(),
-                //     amount: coins(amount.u128(), &denom),
-                // };
-                // router.execute(api, storage, block, from_addr.clone(), transfer_to_contract.into())?;
-
-                // // Step 2: Transfer from contract to receiver
-                // let transfer_to_receiver = BankMsg::Send {
-                //     to_address: to_address.clone(),
-                //     amount: coins(amount.u128(), &denom),
-                // };
-                // router.execute(api, storage, block, contract_addr, transfer_to_receiver.into())?;
-
                 Ok(AppResponse {
                     data: None,
                     events: vec![],
@@ -1113,34 +1096,4 @@ mod tests {
         let expected = SwapAmount::In(Uint128::new(2007));
         assert_eq!(amount, expected);
     }
-
-    // #[test]
-    // fn force_transfer() {
-    //     let mut app = OsmosisApp::new();
-    //     let sender = Addr::unchecked("sender");
-    //     let recipient = Addr::unchecked("recipient");
-    //     let denom = "uatom";
-    //     let amount = Uint128::new(1000);
-
-    //     // Set up initial balances
-    //     app.init_bank_balance(&sender, &coins(amount.u128(), denom));
-
-    //     // Execute force transfer
-    //     let msg = OsmosisMsg::ForceTransfer {
-    //         denom: denom.to_string(),
-    //         amount,
-    //         from_address: sender.to_string(),
-    //         to_address: recipient.to_string(),
-    //     };
-
-    //     let res = app.execute(sender.clone(), CosmosMsg::Custom(msg)).unwrap();
-    //     assert!(res.events.is_empty());
-
-    //     // Verify balances after transfer
-    //     let sender_balance = app.wrap().query_balance(sender, denom).unwrap();
-    //     assert_eq!(sender_balance.amount, Uint128::zero());
-
-    //     let recipient_balance = app.wrap().query_balance(recipient, denom).unwrap();
-    //     assert_eq!(recipient_balance.amount, amount);
-    // }
 }
