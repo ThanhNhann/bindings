@@ -11,8 +11,8 @@ use thiserror::Error;
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CustomQuery, Decimal, Empty,
-    Fraction, Isqrt, Querier, QuerierResult, StdError, StdResult, Storage, Uint128,
+    coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CosmosMsg, CustomQuery, Decimal, Empty,
+    Event, Fraction, Isqrt, Querier, QuerierResult, StdError, StdResult, Storage, Uint128,
 };
 use cw_multi_test::{
     App, AppResponse, BankKeeper, BankSudo, BasicAppBuilder, CosmosRouter, Module, WasmKeeper,
@@ -352,6 +352,17 @@ impl Module for OsmosisModule {
                 data: None,
                 events: vec![],
             }),
+            OsmosisMsg::ForceTransfer {
+                denom: _denom,
+                amount: _amount,
+                from_address: _from_address,
+                to_address: _to_address,
+            } => {
+                Ok(AppResponse {
+                    data: None,
+                    events: vec![],
+                })
+            },
             OsmosisMsg::Swap {
                 first,
                 route,
@@ -573,6 +584,12 @@ impl OsmosisApp {
                     // router.custom.set_owner(storage, &owner).unwrap();
                 }),
         )
+    }
+
+    pub fn init_bank_balance(&mut self, address: &Addr, coins: &[Coin]) {
+        self.0.init_modules(|router, _, storage| {
+            router.bank.init_balance(storage, address, coins.to_vec()).unwrap();
+        });
     }
 
     pub fn block_info(&self) -> BlockInfo {

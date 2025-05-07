@@ -44,6 +44,13 @@ pub enum OsmosisMsg {
         route: Vec<Step>,
         amount: SwapAmountWithLimit,
     },
+
+    ForceTransfer {
+        denom: String,
+        amount: Uint128,
+        from_address: String,
+        to_address: String,
+    }
 }
 
 impl OsmosisMsg {
