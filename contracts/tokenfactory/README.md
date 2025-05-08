@@ -13,11 +13,12 @@ to import and use some test utilities.
 
 ## Messages
 
-There are 4 messages:
+There are 5 messages:
 - `ExecuteMsg::CreateDenom` maps to `OsmosisMsg::CreateDenom`
 - `ExecuteMsg::ChangeAdmin` maps to `OsmosisMsg::ChangeAdmin`
 - `ExecuteMsg::BurnTokens` maps to `OsmosisMsg::BurnTokens`
 - `ExecuteMsg::MintTokens` maps to `OsmosisMsg::MintTokens`
+- `ExecuteMsg::ForceTransfer` maps to `OsmosisMsg::ForceTransfer`
 
 ## Query
 
@@ -130,6 +131,23 @@ osmosisd q bank total-supply-of factory/$CONTRACT_ADDR/mydenom
 # You should see this in the list:
 # - amount: "100"
 #   denom: factory/osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9
+```
+
+- `Force Transfer` executing from test1, transferring from test2 to test1
+```sh
+TEST2_ADDR=osmo18s5lynnmx37hq4wlrw9gdn68sg2uxp5rgk26vv # This is from the result of "Download and Install LocalOsmosis" section
+
+# First mint some tokens to test2
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"mint_tokens\": {\"amount\": \"100\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"mint_to_address\": \"$TEST2_ADDR\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
+
+# Then force transfer from test2 to test1
+osmosisd tx wasm execute $CONTRACT_ADDR "{ \"force_transfer\": {\"amount\": \"50\", \"denom\": \"factory/${CONTRACT_ADDR}/mydenom\", \"from_address\": \"$TEST2_ADDR\", \"to_address\": \"$CONTRACT_ADDR\"}}" --from test1 --gas-prices 0.1uosmo --gas auto --gas-adjustment 1.3 --chain-id localosmosis
+
+# Verify balances
+osmosisd q bank balances $TEST2_ADDR
+# Should show 50 tokens remaining
+osmosisd q bank balances $CONTRACT_ADDR
+# Should show 50 tokens received
 ```
 
 - `Burn Tokens` executing from test1, minting from test2
